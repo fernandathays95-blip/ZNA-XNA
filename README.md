@@ -46,6 +46,21 @@ O projeto visa ser instalado em qualquer hardware que suporte o protocolo de int
 
 ### 1. Clonar o Repositório
 
-```bash
+
 git clone https://github.com/fernandathays95-blip/ZNA-XNA.git
-cd ZNA & XNA
+cd ZNA-XNA
+
+## 2. Carregar a Arquitetura no Chip (Implementação)
+Assumindo que você tem o hardware de injeção molecular (molecular-injector):
+# O comando traduz e injeta a lógica XNA (os códigos) na molécula ZNA do chip.
+./molecular-injector load --architecture ZNA-XNA --chip-id ZNAGGIEU-8394JjfHGJGJE 
+
+# Inicia o sistema, ativando a Célula Heltde (H) e a Célula E3.
+./molecular-injector activate --identity ZNAGGIEU-8394JjfHGJGJE
+
+## 3. Modificando a Lógica (O Código XNA)
+Para modificar o comportamento do chip, basta alterar os arquivos de código (C, Rust, Assembly) na pasta /src/xna_logic e recarregar.
+## 🤝 Contribuição
+Sua experiência em linguagens de sistema (C, Rust) é crucial para aprimorar a lógica de Reparo (RU) e Performance (CL). Abra Issues para discussão de novos componentes moleculares.
+## 📜 Licença
+Distribuído sob a Licença MIT.
