@@ -47,5 +47,5 @@ O projeto visa ser instalado em qualquer hardware que suporte o protocolo de int
 ### 1. Clonar o Repositório
 
 ```bash
-git clone [https://github.com/SeuUsuario/ZNA-XNA.git](https://github.com/SeuUsuario/ZNA-XNA.git)
-cd ZNA-XNA
+git clone https://github.com/fernandathays95-blip/ZNA-XNA.git
+cd ZNA & XNA
