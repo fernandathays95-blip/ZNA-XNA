@@ -5,14 +5,19 @@
 #include <iostream>
 #include <string>
 #include <map>
+#include <stdexcept>
 
-// O caminho lógico para o armazenamento principal, exposto ao XNA
+// --- Definições de Caminho ---
+// O caminho lógico principal
 #define CAMINHO_STORAGE_PRINCIPAL "/storage/emulated/0/"
+// Caminhos de sistema críticos gerenciados pelo XNA
+#define CAMINHO_ZNA_ROOT          CAMINHO_STORAGE_PRINCIPAL "ZNA/"
+#define CAMINHO_ZNA_DATA          CAMINHO_ZNA_ROOT "data/"
+#define CAMINHO_ZNA_OBB           CAMINHO_ZNA_ROOT "obb/"
 
 /**
  * @brief Classe de abstração para gerenciamento de arquivos no armazenamento SD.
- * Esta classe traduz os caminhos lógicos (como /storage/emulated/0/) 
- * para os endereços de bloco físicos do SD Card.
+ * Traduz caminhos lógicos para operações de bloco do SD Card.
  */
 class XNA_SD_Filesystem {
 private:
@@ -20,33 +25,61 @@ private:
     // Tabela de Mapeamento: Caminho Lógico (string) para Bloco Inicial (uint32_t)
     std::map<std::string, uint32_t> file_block_map;
 
-    // Simulação de metadados de um sistema de arquivos. 
-    // Em um sistema real, essa tabela estaria armazenada no ZNA.
     void load_metadata_map() {
         // Inicializa a Tabela de Alocação de Arquivos Lógicos.
-        // O XNA lê e gerencia essas entradas.
-        file_block_map["/storage/emulated/0/system_config.xna"] = 100;
-        file_block_map["/storage/emulated/0/user_data/photos.dat"] = 500;
-        file_block_map["/storage/emulated/0/runtime_logs.txt"] = 800;
-        // O caminho principal em si não é um arquivo, mas a raiz da navegação.
+        // O XNA deve ler e gerenciar essas entradas.
+
+        // Mapeamento de Arquivos do Sistema ZNA (Dados Críticos)
+        file_block_map[CAMINHO_ZNA_DATA "app_cache.dat"] = 100;
+        file_block_map[CAMINHO_ZNA_OBB "jogo_xna_recursos.obb"] = 5000; // Pacote grande
+        
+        // Mapeamento de Exemplo de Arquivos de Usuário
+        file_block_map[CAMINHO_STORAGE_PRINCIPAL "fotos.jpg"] = 2000;
+    }
+
+    uint32_t encontrar_bloco_por_nome(const std::string& caminho) {
+        auto it = file_block_map.find(caminho);
+        if (it == file_block_map.end()) {
+            throw std::runtime_error("Arquivo não encontrado no metadados ZNA.");
+        }
+        return it->second;
     }
 
 public:
     XNA_SD_Filesystem() : is_initialized(false) {
-        // Tenta inicializar o driver C de baixo nível.
         if (sdcard_iniciar() == SD_OK) {
             is_initialized = true;
             load_metadata_map();
-            std::cout << "XNA Filesystem: Montado com sucesso em " << CAMINHO_STORAGE_PRINCIPAL << std::endl;
+            std::cout << "XNA Filesystem: Montagem em " << CAMINHO_STORAGE_PRINCIPAL << " concluída." << std::endl;
         } else {
             std::cerr << "ERRO: Falha na montagem do SD Card." << std::endl;
         }
     }
 
     /**
+     * @brief Retorna o caminho da pasta de dados de aplicativo (cache, saves).
+     */
+    const std::string get_data_path() const {
+        return CAMINHO_ZNA_DATA;
+    }
+
+    /**
+     * @brief Retorna o caminho para pacotes extras de jogos/aplicativos grandes.
+     */
+    const std::string get_obb_path() const {
+        return CAMINHO_ZNA_OBB;
+    }
+    
+    /**
+     * @brief Retorna o caminho raiz do sistema ZNA.
+     */
+    const std::string get_zna_root_path() const {
+        return CAMINHO_ZNA_ROOT;
+    }
+
+    /**
      * @brief Lê o conteúdo de um caminho lógico do SD Card para o ZNA.
-     * @param caminho_logico Caminho completo do arquivo (ex: /storage/emulated/0/file.txt).
-     * @param endereco_zna Endereço ZNA de destino.
+     * Implementação completa lendo a tabela de mapeamento.
      */
     void ler_arquivo(const std::string& caminho_logico, uint64_t endereco_zna) {
         if (!is_initialized) {
@@ -54,33 +87,21 @@ public:
             return;
         }
 
-        auto it = file_block_map.find(caminho_logico);
-
-        if (it == file_block_map.end()) {
-            std::cerr << "ERRO: Arquivo não encontrado no caminho lógico: " << caminho_logico << std::endl;
-            return;
+        try {
+            uint32_t bloco_inicial = encontrar_bloco_por_nome(caminho_logico);
+            
+            // Chama a função de leitura de bloco do driver C de baixo nível
+            if (sdcard_ler_bloco(bloco_inicial, endereco_zna) == SD_OK) {
+                std::cout << "SUCESSO: Conteúdo lido para ZNA de: " << caminho_logico << std::endl;
+            } else {
+                std::cerr << "ERRO: Falha na leitura do bloco " << bloco_inicial << " do SD Card." << std::endl;
+            }
+        } catch (const std::runtime_error& e) {
+            std::cerr << "ERRO de FS: " << e.what() << std::endl;
         }
-
-        uint32_t bloco_inicial = it->second;
-        
-        // Chama a função de leitura de bloco do driver C de baixo nível
-        if (sdcard_ler_bloco(bloco_inicial, endereco_zna) == SD_OK) {
-            std::cout << "SUCESSO: Conteúdo de " << caminho_logico << " lido para ZNA:" << std::hex << endereco_zna << std::endl;
-        } else {
-            std::cerr << "ERRO: Falha na leitura do SD Card." << std::endl;
-        }
-    }
-    
-    /**
-     * @brief Retorna o caminho de armazenamento principal exposto pelo sistema.
-     * @return O caminho lógico da raiz do armazenamento emulado.
-     */
-    const std::string& get_storage_path() const {
-        return CAMINHO_STORAGE_PRINCIPAL;
     }
 };
 
-// Exemplo de uso pelo sistema XNA:
+// Exemplo de uso:
 // XNA_SD_Filesystem sd_fs;
-// std::cout << "Raiz do Armazenamento: " << sd_fs.get_storage_path() << std::endl; 
-// sd_fs.ler_arquivo("/storage/emulated/0/system_config.xna", 0x1000000000000000ULL);
+// sd_fs.ler_arquivo(sd_fs.get_data_path() + "app_cache.dat", 0x1000000000000000ULL);
